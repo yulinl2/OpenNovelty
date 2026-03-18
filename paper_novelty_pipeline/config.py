@@ -23,8 +23,18 @@ GROBID_URL = os.getenv("GROBID_URL", "http://localhost:8070/api/processFulltextD
 # OpenReview URL
 OPENREVIEW_PDF_URL = "https://openreview.net/pdf"
 
-# Wispaper API Configuration
+# Wispaper API Configuration (legacy – no longer used; kept for reference)
 WISPAPER_API_ENDPOINT = os.getenv("WISPAPER_API_ENDPOINT", "https://gateway.wispaper.ai/api/v1/search/completions")
+
+# Semantic Scholar API Configuration (used for Phase 2 paper search)
+SEMANTIC_SCHOLAR_API_ENDPOINT = os.getenv(
+    "SEMANTIC_SCHOLAR_API_ENDPOINT",
+    "https://api.semanticscholar.org/graph/v1/paper/search",
+)
+# Optional API key for higher rate limits (free tier: ~100 req/5 min without key)
+SEMANTIC_SCHOLAR_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY") or None
+# Max results per query variant (default 100; capped at 500 inside the client)
+SEMANTIC_SCHOLAR_MAX_RESULTS = int(os.getenv("SEMANTIC_SCHOLAR_MAX_RESULTS", "100"))
 
 
 # LLM API Configuration (global defaults)
