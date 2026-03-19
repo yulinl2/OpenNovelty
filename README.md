@@ -35,7 +35,7 @@ Novelty is a key criterion in peer review, but manual evaluation is often constr
 | Phase | Functionality | Key Input | Key Output | Time | Dependencies |
 |:-----:|--------------|----------|-----------|:----:|-------------|
 | **I** | Information Extraction | Paper PDF URL | `phase1_extracted.json` | ~1 min | LLM API |
-| **II** | Literature Retrieval | Phase 1 outputs | `citation_index.json` | ~10 min | Wispaper API |
+| **II** | Literature Retrieval | Phase 1 outputs | `citation_index.json` | ~10 min | Semantic Scholar API |
 | **III** | Deep Analysis | Phase 2 outputs | `phase3_complete_report.json` | ~10 min | LLM API |
 | **IV** | Report Generation | Phase 3 outputs | `novelty_report.md/pdf` | ~30 sec | weasyprint |
 
@@ -47,10 +47,9 @@ Novelty is a key criterion in peer review, but manual evaluation is often constr
 - Generate 3 retrieval query variants for each task/contribution
 
 **Phase II — Literature Retrieval**
-- Semantic retrieval of related papers (via [WisPaper API](https://wispaper.ai) [[paper]](https://huggingface.co/papers/2512.06879))
+- Semantic retrieval of related papers via the [Semantic Scholar Graph API](https://api.semanticscholar.org/graph/v1) (free, no key required)
 - Quality filtering (perfect-match, time filtering) and deduplication (`canonical_id` + title normalization)
 - Build a citation index (Core Task Top-50, Contribution Top-10)
-- ⚠️ **Note**: Phase 2 depends on Wispaper API which is **not yet publicly available**. The API will be opened soon — please stay tuned for updates!
 
 **Phase III — Deep Analysis**
 - Build a related-work taxonomy and synthesize a survey
@@ -73,7 +72,7 @@ Novelty is a key criterion in peer review, but manual evaluation is often constr
 | **OS** | Linux (Ubuntu 20.04+) / macOS |
 | **Python** | 3.8+ (recommended: 3.10+) |
 | **Memory** | 8GB+ |
-| **Network** | Access to OpenReview, Wispaper API, and an LLM API |
+| **Network** | Access to OpenReview, Semantic Scholar API, and an LLM API |
 
 ### 1️⃣ Install Dependencies
 
@@ -102,8 +101,10 @@ export LLM_API_ENDPOINT="https://openrouter.ai/api/v1"           # Example
 export LLM_API_KEY="sk-xxxxxxxx"
 export LLM_MODEL_NAME="anthropic/claude-sonnet-4.5"           # Example
 
-# ============ Wispaper API (Required for Phase 2) ============
-# Token is saved to ~/.wispaper_tokens.json by default (see first-time setup below)
+# ============ Semantic Scholar API (Optional — improves Phase 2 rate limits) ============
+# Without a key the free tier allows ~100 requests per 5 minutes.
+# Register for a free key at: https://www.semanticscholar.org/product/api
+# export SEMANTIC_SCHOLAR_API_KEY="your-api-key-here"
 
 # ============ Phase 3 Configuration (Recommended) ============
 export SKIP_TEXTUAL_SIMILARITY="true"           # Skip similarity detection (under development)
@@ -112,34 +113,6 @@ export SKIP_TEXTUAL_SIMILARITY="true"           # Skip similarity detection (und
 export HTTP_PROXY="http://127.0.0.1:7893"
 export HTTPS_PROXY="http://127.0.0.1:7893"
 ```
-
-#### 🔐 Wispaper Authentication (Before Running Phase 2)
-
-> ⚠️ **Coming Soon**: Wispaper API is not yet publicly available. The following configuration will be enabled once the API is opened.
-
-<!--
-**One-time setup, long-term effective**:
-
-```bash
-python scripts/refresh_wispaper_token.py
-# → 🌐 Automatically opens a browser for login (register first: https://wispaper.ai)
-# → 💾 Token saved to ~/.wispaper_tokens.json
-# → 🔄 Auto-refresh enabled, no need to repeat
-```
-
-**Custom token path** (optional):
-
-```bash
-export WISPAPER_TOKEN_FILE="/your/custom/path/wispaper_tokens.json"
-```
-
-**Verify configuration**:
-
-```bash
-python -c "from paper_novelty_pipeline.services.wispaper_client import WispaperClient; WispaperClient()"
-# Seeing "Loaded token bundle" indicates success
-```
--->
 
 ### 3️⃣ Example Run (Single Paper)
 
@@ -153,7 +126,7 @@ python scripts/run_phase1_batch.py \
   --force-year 2026 \
   2>&1 | tee logs/phase1.log
 
-# Phase 2 - Retrieval (~10 min) ⚠️ Requires Wispaper API (coming soon)
+# Phase 2 - Retrieval (~10 min)
 bash scripts/run_phase2_concurrent.sh \
   openreview_ZgCCDwcGwn_20260118 \
   --base-dir output/demo \
@@ -191,7 +164,7 @@ python scripts/run_phase1_batch.py \
   --out-root output/batch \
   --force-year 2026
 
-# Phase 2: Batch retrieval (auto-discover all papers) ⚠️ Requires Wispaper API (coming soon)
+# Phase 2: Batch retrieval (auto-discover all papers)
 bash scripts/run_phase2_concurrent.sh \
   --base-dir output/batch \
   --auto-discover \           # Auto-discover all papers with Phase 1 completed under base-dir
@@ -211,9 +184,8 @@ bash scripts/run_phase3_phase4_serial_pending.sh output/batch
 
 | Command                                        | Purpose                               |
 | ---------------------------------------------- | ------------------------------------- |
-| `python scripts/refresh_wispaper_token.py`     | Refresh Wispaper token ⚠️ (coming soon) |
 | `python scripts/run_phase1_batch.py --help`    | Show Phase 1 help                     |
-| `bash scripts/run_phase2_concurrent.sh --help` | Show Phase 2 help ⚠️ (coming soon)     |
+| `bash scripts/run_phase2_concurrent.sh --help` | Show Phase 2 help                     |
 | `cat logs/phase2.log \| grep ERROR`            | Locate error logs                     |
 
 ---
@@ -225,12 +197,11 @@ bash scripts/run_phase3_phase4_serial_pending.sh output/batch
 | Script                                | Function                    | Use Case                               |       Time      |
 | ------------------------------------- | --------------------------- | -------------------------------------- | :-------------: |
 | `run_phase1_batch.py`                 | Information extraction      | Single / batch                         |  ~1 min / paper |
-| `run_phase2_concurrent.sh`            | Literature retrieval ⚠️      | Single / batch (coming soon)           | ~10 min / paper |
-| `run_phase2_only.py`                  | Retrieval (single paper) ⚠️  | Coming soon                            | ~10 min / paper |
+| `run_phase2_concurrent.sh`            | Literature retrieval        | Single / batch                         | ~10 min / paper |
+| `run_phase2_only.py`                  | Retrieval (single paper)    | Single paper                           | ~10 min / paper |
 | `run_phase3_all.sh`                   | Deep analysis (7 sub-steps) | Single / batch                         | ~10 min / paper |
 | `run_phase4.sh`                       | Report generation           | Single paper                           | ~30 sec / paper |
 | `run_phase3_phase4_serial_pending.sh` | Batch completion            | Auto-discover papers with Phase 2 done |        -        |
-| `refresh_wispaper_token.py`           | Token refresh ⚠️             | Coming soon                            |     ~10 sec     |
 
 ### Directory Layout
 
@@ -277,7 +248,7 @@ output/<run>/<paper_id>/
 
 | Issue                            | Symptom                              | Solution                                                                     |
 | -------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------- |
-| **Wispaper token expired**       | `401 Unauthorized` / `Token expired` | ⚠️ Wispaper API coming soon                                                   |
+| **Semantic Scholar rate limit**  | `429 Too Many Requests`              | Add a free API key via `SEMANTIC_SCHOLAR_API_KEY` in `.env`; pipeline retries automatically |
 | **PDF download failure**         | `ConnectionError` / `Timeout`        | Check network, URL validity, and proxy settings                              |
 | **LLM API call failure**         | `API Error` / `Invalid key`          | Check `LLM_API_KEY`, `LLM_MODEL_NAME`, and quota                             |
 | **PDF generation failure**       | `weasyprint error`                   | `sudo apt-get install libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0` |
@@ -324,8 +295,9 @@ python -m scripts.run_phase3_core_task_comparisons \
 echo "LLM_API_KEY: ${LLM_API_KEY:0:10}..."
 echo "LLM_MODEL_NAME: $LLM_MODEL_NAME"
 
-# Validate Wispaper token (⚠️ coming soon)
-# python -c "from paper_novelty_pipeline.services.wispaper_client import WispaperClient; client = WispaperClient(); print('Token valid!')"
+# Validate Semantic Scholar API (optional key)
+python -c "from paper_novelty_pipeline.services.semantic_scholar_client import SemanticScholarClient; print(SemanticScholarClient().health_check())"
+# Should print: True
 
 # Check Phase 1 output
 cat output/demo/openreview_XXX/phase1/phase1_extracted.json | jq '.core_task'
