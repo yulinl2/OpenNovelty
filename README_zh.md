@@ -36,7 +36,7 @@
 | Phase | 功能 | 关键输入 | 关键输出 | 耗时 | 依赖 |
 |:-----:|------|---------|---------|:----:|------|
 | **I** | 信息抽取 | 论文 PDF URL | `phase1_extracted.json` | ~1 min | LLM API |
-| **II** | 文献检索 | Phase 1 输出 | `citation_index.json` | ~10 min | Wispaper API |
+| **II** | 文献检索 | Phase 1 输出 | `citation_index.json` | ~10 min | Semantic Scholar API |
 | **III** | 深度分析 | Phase 2 输出 | `phase3_complete_report.json` | ~10 min | LLM API |
 | **IV** | 报告生成 | Phase 3 输出 | `novelty_report.md/pdf` | ~30 sec | weasyprint |
 
@@ -48,10 +48,9 @@
 - 为每个任务/贡献生成 3 条检索查询变体
 
 **Phase II — 文献检索**
-- 语义检索相关论文（[WisPaper API](https://wispaper.ai) [[论文]](https://huggingface.co/papers/2512.06879)）
+- 通过 [Semantic Scholar Graph API](https://api.semanticscholar.org/graph/v1) 进行语义检索（免费，无需 API Key）
 - 质量过滤（完美匹配、时间过滤）、去重（canonical_id + 标题归一化）
 - 生成引用索引（核心任务 Top-50、贡献 Top-10）
-- ⚠️ **注意**：Phase 2 依赖的 Wispaper API **暂未公开开放**，后续将会放开，敬请关注！
 
 **Phase III — 深度分析**
 - 生成相关工作层次分类和综述
@@ -74,7 +73,7 @@
 | **操作系统** | Linux (Ubuntu 20.04+) / macOS |
 | **Python** | 3.8+ (推荐 3.10+) |
 | **内存** | 8GB+ |
-| **网络** | 需访问 OpenReview、Wispaper API、LLM API |
+| **网络** | 需访问 OpenReview、Semantic Scholar API、LLM API |
 
 ### 1️⃣ 安装依赖
 
@@ -103,8 +102,10 @@ export LLM_API_ENDPOINT="https://openrouter.ai/api/v1"           # 示例
 export LLM_API_KEY="sk-xxxxxxxx"
 export LLM_MODEL_NAME="anthropic/claude-sonnet-4.5"           # 示例
 
-# ============ Wispaper API（Phase 2 必需）============
-# Token 默认保存到 ~/.wispaper_tokens.json（首次配置见下方）
+# ============ Semantic Scholar API（可选——提升 Phase 2 速率限制）============
+# 无 Key 时使用免费额度（约 100 次请求/5 分钟）。
+# 在以下地址注册免费 API Key：https://www.semanticscholar.org/product/api
+# export SEMANTIC_SCHOLAR_API_KEY="your-api-key-here"
 
 # ============ Phase 3 配置（推荐）============
 export SKIP_TEXTUAL_SIMILARITY="true"           # 跳过相似度检测（方法研发中）
@@ -113,32 +114,6 @@ export SKIP_TEXTUAL_SIMILARITY="true"           # 跳过相似度检测（方法
 export HTTP_PROXY="http://127.0.0.1:7893"         
 export HTTPS_PROXY="http://127.0.0.1:7893"
 ```
-
-#### 🔐 Wispaper 鉴权（首次运行 Phase 2 前）
-
-> ⚠️ **即将开放**：Wispaper API 暂未公开开放，以下配置将在 API 开放后启用。
-
-<!--
-**一次配置，长期有效**：
-
-```bash
-python scripts/refresh_wispaper_token.py
-# → 🌐 自动打开浏览器登录（需先注册：https://wispaper.ai）
-# → 💾 Token 保存到 ~/.wispaper_tokens.json
-# → 🔄 自动刷新，无需再次操作
-```
-
-**自定义 Token 路径**（可选）：
-```bash
-export WISPAPER_TOKEN_FILE="/your/custom/path/wispaper_tokens.json"
-```
-
-**验证配置**：
-```bash
-python -c "from paper_novelty_pipeline.services.wispaper_client import WispaperClient; WispaperClient()"
-# 看到 "Loaded token bundle" 即表示成功
-```
--->
 
 ### 3️⃣ 运行示例（单篇论文）
 
@@ -152,7 +127,7 @@ python scripts/run_phase1_batch.py \
   --force-year 2026 \
   2>&1 | tee logs/phase1.log
 
-# Phase 2 - 文献检索（~10 min）⚠️ 需要 Wispaper API（即将开放）
+# Phase 2 - 文献检索（~10 min）
 bash scripts/run_phase2_concurrent.sh \
   openreview_ZgCCDwcGwn_20260118 \
   --base-dir output/demo \
@@ -190,7 +165,7 @@ python scripts/run_phase1_batch.py \
   --out-root output/batch \
   --force-year 2026
 
-# Phase 2: 批量检索（自动发现所有论文）⚠️ 需要 Wispaper API（即将开放）
+# Phase 2: 批量检索（自动发现所有论文）
 bash scripts/run_phase2_concurrent.sh \
   --base-dir output/batch \
   --auto-discover \           # 自动发现 base-dir 下所有已完成 Phase 1 的论文
@@ -209,9 +184,8 @@ bash scripts/run_phase3_phase4_serial_pending.sh output/batch
 
 | 命令 | 用途 |
 |------|------|
-| `python scripts/refresh_wispaper_token.py` | 刷新 Wispaper Token ⚠️（即将开放） |
 | `python scripts/run_phase1_batch.py --help` | 查看 Phase 1 帮助 |
-| `bash scripts/run_phase2_concurrent.sh --help` | 查看 Phase 2 帮助 ⚠️（即将开放） |
+| `bash scripts/run_phase2_concurrent.sh --help` | 查看 Phase 2 帮助 |
 | `cat logs/phase2.log \| grep ERROR` | 定位错误日志 |
 
 ---
@@ -223,12 +197,11 @@ bash scripts/run_phase3_phase4_serial_pending.sh output/batch
 | 脚本 | 功能 | 使用场景 | 耗时 |
 |------|------|---------|:----:|
 | `run_phase1_batch.py` | 信息抽取 | 单篇/批量 | ~1 min/篇 |
-| `run_phase2_concurrent.sh` | 文献检索 ⚠️ | 单篇/批量（即将开放） | ~10 min/篇 |
-| `run_phase2_only.py` | 文献检索（单篇）⚠️ | 即将开放 | ~10 min/篇 |
+| `run_phase2_concurrent.sh` | 文献检索 | 单篇/批量 | ~10 min/篇 |
+| `run_phase2_only.py` | 文献检索（单篇） | 单篇 | ~10 min/篇 |
 | `run_phase3_all.sh` | 深度分析（7个子步骤） | 单篇/批量 | ~10 min/篇 |
 | `run_phase4.sh` | 报告生成 | 单篇 | ~30 sec/篇 |
 | `run_phase3_phase4_serial_pending.sh` | 批量补齐 | 自动发现已完成 Phase 2 的论文 | - |
-| `refresh_wispaper_token.py` | Token 刷新 ⚠️ | 即将开放 | ~10 sec |
 
 ### 目录结构
 
@@ -275,7 +248,7 @@ output/<run>/<paper_id>/
 
 | 问题 | 症状 | 解决方案 |
 |------|------|---------|
-| **Wispaper Token 过期** | `401 Unauthorized` / `Token expired` | ⚠️ Wispaper API 即将开放 |
+| **Semantic Scholar 速率限制** | `429 Too Many Requests` | 在 `.env` 中设置 `SEMANTIC_SCHOLAR_API_KEY`；Pipeline 会自动重试 |
 | **PDF 下载失败** | `ConnectionError` / `Timeout` | 检查网络连接、URL 正确性、代理设置 |
 | **LLM API 调用失败** | `API Error` / `Invalid key` | 检查 `.env` 中的 `LLM_API_KEY`、`LLM_MODEL_NAME`、API 额度 |
 | **PDF 生成失败** | `weasyprint error` | `sudo apt-get install libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0` |
@@ -319,8 +292,9 @@ python -m scripts.run_phase3_core_task_comparisons \
 echo "LLM_API_KEY: ${LLM_API_KEY:0:10}..."
 echo "LLM_MODEL_NAME: $LLM_MODEL_NAME"
 
-# 验证 Wispaper Token（⚠️ 即将开放）
-# python -c "from paper_novelty_pipeline.services.wispaper_client import WispaperClient; client = WispaperClient(); print('Token valid!')"
+# 验证 Semantic Scholar API（可选 Key）
+python -c "from paper_novelty_pipeline.services.semantic_scholar_client import SemanticScholarClient; print(SemanticScholarClient().health_check())"
+# 应输出：True
 
 # 检查 Phase 1 输出
 cat output/demo/openreview_XXX/phase1/phase1_extracted.json | jq '.core_task'

@@ -447,26 +447,61 @@ class Phase2Processor:
             return match.group(1)
         return None
 
-    def _extract_papers_from_events(self, events: List[Dict]) -> List[Dict]:
+    def _extract_papers_from_events(self, events) -> List[Dict]:
         """
-        Extract paper metadata from Wispaper SSE events and generate quality flags.
-        
-        Parses verification events from Wispaper's streaming response, extracting
-        paper metadata and calculating quality flags based on the verdict.
-        
+        Extract paper metadata from a raw response file and generate quality flags.
+
+        Supports two raw-response formats:
+
+        1. **Semantic Scholar format** (dict with ``"backend": "semantic_scholar"``):
+           Written by the current Semantic Scholar-based PaperSearcher.  Each
+           paper already carries a ``flags`` dict; all papers are treated as
+           "perfect" so they pass the quality-filter step downstream.
+
+        2. **Wispaper SSE events format** (list of dicts):
+           Legacy format from the original Wispaper API integration.  Kept for
+           backward compatibility so that existing ``raw_responses/`` directories
+           produced by earlier pipeline runs can still be post-processed.
+
         Args:
-            events: List of SSE event dictionaries from Wispaper API
-            
+            events: Either a dict (Semantic Scholar format) or a list of SSE
+                    event dicts (Wispaper legacy format).
+
         Returns:
-            List of paper dictionaries with 'flags' field added
+            List of paper dictionaries, each with a ``'flags'`` field.
         """
-        papers: List[Dict] = []
+        # ------------------------------------------------------------------
+        # Semantic Scholar format (dict)
+        # ------------------------------------------------------------------
+        if isinstance(events, dict):
+            if events.get("backend") == "semantic_scholar":
+                papers_raw = events.get("papers") or []
+                papers: List[Dict] = []
+                for p in papers_raw:
+                    paper = dict(p)
+                    # Ensure flags are present (they should already be set by
+                    # semantic_scholar_client, but be defensive).
+                    if "flags" not in paper or not isinstance(paper["flags"], dict):
+                        paper["flags"] = {"perfect": True, "partial": False, "no": False}
+                    papers.append(paper)
+                return papers
+            # Unknown dict format – return empty
+            logger.warning(
+                "Unrecognised raw response dict format (backend=%r). Skipping.",
+                events.get("backend"),
+            )
+            return []
+
+        # ------------------------------------------------------------------
+        # Wispaper legacy SSE events format (list)
+        # ------------------------------------------------------------------
+        papers = []
         for event in events:
             if event.get("event") == "onAgentEnd" and event.get("name") == "verification":
                 data = event.get("data", {})
                 metadata = data.get("metadata", {})
                 content = data.get("content")  # This contains the verdict JSON string
-                
+
                 if not metadata:
                     continue
 
@@ -476,16 +511,19 @@ class Phase2Processor:
                     try:
                         verdict = json.loads(content)
                     except json.JSONDecodeError:
-                        logger.debug(f"Could not decode verdict JSON from content: {content[:100]}...")
+                        logger.debug(
+                            "Could not decode verdict JSON from content: %s...",
+                            content[:100],
+                        )
                         verdict = None
-                
+
                 # Calculate quality flags using the extracted helper function
                 flags = _calculate_quality_flags(verdict)
-                
+
                 paper = dict(metadata)  # Copy metadata
-                paper['flags'] = flags  # Add generated flags
+                paper["flags"] = flags  # Add generated flags
                 papers.append(paper)
-        
+
         return papers
 
     def _process_scope(

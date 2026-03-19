@@ -1,14 +1,9 @@
 """
-Wispaper API client for academic paper search.
+Wispaper API client (legacy – replaced by Semantic Scholar).
 
-This module provides:
-  - OAuth2 authentication flow (browser-based login, token management, auto-refresh)
-  - Academic paper search via Wispaper API
-  - SSE (Server-Sent Events) and JSON response handling
-  - Structured search with paper metadata normalization
-
-Note:
-  Wispaper API access will be publicly available in a future release.
+This module is kept for backward compatibility only.  The Wispaper API was
+never publicly released.  Phase 2 now uses the Semantic Scholar Graph API
+via :mod:`paper_novelty_pipeline.services.semantic_scholar_client`.
 """
 
 from typing import List, Dict, Any, Optional
@@ -17,31 +12,35 @@ from pathlib import Path
 
 def _run_oauth_flow() -> Optional[str]:
     """Run browser-based OAuth2 flow to obtain access token.
-    
-    Note: Wispaper API will be publicly available in a future release.
+
+    .. deprecated::
+        Wispaper has been replaced by Semantic Scholar.  This function is
+        retained for reference and will raise :class:`NotImplementedError`.
     """
     raise NotImplementedError(
-        "Wispaper OAuth flow is not yet publicly available. "
-        "Please check the project repository for updates on API access."
+        "Wispaper has been replaced by Semantic Scholar for Phase 2 paper search. "
+        "See paper_novelty_pipeline.services.semantic_scholar_client."
     )
 
 
 class WispaperClient:
-    """Client for Wispaper academic search API with automatic OAuth handling.
-    
-    Note: Wispaper API will be publicly available in a future release.
+    """Client for Wispaper academic search API (legacy – no longer used).
+
+    .. deprecated::
+        Wispaper has been replaced by Semantic Scholar.  Instantiating this
+        class raises :class:`NotImplementedError`.
     """
-    
+
     def __init__(self):
         raise NotImplementedError(
-            "Wispaper API client is not yet publicly available. "
-            "Please check the project repository for updates on API access."
+            "Wispaper has been replaced by Semantic Scholar for Phase 2 paper search. "
+            "See paper_novelty_pipeline.services.semantic_scholar_client."
         )
-    
+
     def search(self, query: str) -> List[Dict[str, Any]]:
         """Search for academic papers."""
-        raise NotImplementedError("Wispaper API is not yet publicly available.")
-    
+        raise NotImplementedError("Wispaper has been replaced by Semantic Scholar.")
+
     def search_structured(
         self,
         query: str,
@@ -52,8 +51,8 @@ class WispaperClient:
         sse_max_events: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Perform a structured search with normalized paper metadata."""
-        raise NotImplementedError("Wispaper API is not yet publicly available.")
-    
+        raise NotImplementedError("Wispaper has been replaced by Semantic Scholar.")
+
     def health_check(self) -> bool:
         """Check if the Wispaper API is accessible."""
-        raise NotImplementedError("Wispaper API is not yet publicly available.")
+        raise NotImplementedError("Wispaper has been replaced by Semantic Scholar.")
