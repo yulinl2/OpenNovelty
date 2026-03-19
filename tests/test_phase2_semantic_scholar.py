@@ -903,9 +903,9 @@ class TestPhase2EndToEnd:
                     searcher = PaperSearcher(concurrency=1)
                     stats = searcher.search_all(extracted, phase2_dir)
 
-        raw_files = list((phase2_dir / "raw_responses").glob("raw_*.json"))
-        assert len(raw_files) == 3  # raw_core_task_v0, raw_core_task_v1, raw_contribution_1_v0
-        assert stats["succeeded"] == 3
+            raw_files = list((phase2_dir / "raw_responses").glob("raw_*.json"))
+            assert len(raw_files) == 3  # raw_core_task_v0, raw_core_task_v1, raw_contribution_1_v0
+            assert stats["succeeded"] == 3
 
     def test_original_paper_excluded_from_candidates(self):
         """The original paper must NOT appear as its own candidate."""
